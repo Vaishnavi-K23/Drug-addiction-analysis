@@ -14,30 +14,57 @@ OUTPUT_PATH = "Data/clean_mortality_2004_2023.csv"
 # ========== HELPER FUNCTIONS ==========
 
 def parse_age_min(group: str):
-    """Extract minimum age from strings like '15-24 years' or '85+ years'."""
+    """Extract minimum age from diverse CDC formats."""
     if pd.isna(group):
         return np.nan
-    m = re.search(r"(\d+)", str(group))
+    s = str(group).lower()
+
+    # Case: "Under 1 year"
+    if "under" in s:
+        return 0
+    
+    # Case: "Not Stated", "Unknown", etc.
+    if "not" in s or "unknown" in s:
+        return np.nan
+    
+    # Case: "85+ years"
+    m_plus = re.search(r"(\d+)\+", s)
+    if m_plus:
+        return int(m_plus.group(1))
+
+    # Case: ranges "15-24 years", "5–14 years" (en-dash)
+    m_range = re.search(r"(\d+)[\-\–](\d+)", s)
+    if m_range:
+        return int(m_range.group(1))
+
+    # Last fallback: first number in string
+    m = re.search(r"(\d+)", s)
     return int(m.group(1)) if m else np.nan
 
 
+
 def parse_age_max(group: str):
-    """Extract maximum age; for '85+ years' approximate as min+9."""
     if pd.isna(group):
         return np.nan
-    s = str(group)
+    s = str(group).lower()
 
-    # pattern like '15-24 years'
-    m = re.search(r"-(\d+)", s)
-    if m:
-        return int(m.group(1))
+    if "under" in s:
+        return 1
+    
+    if "not" in s or "unknown" in s:
+        return np.nan
+    
+    m_range = re.search(r"(\d+)[\-\–](\d+)", s)
+    if m_range:
+        return int(m_range.group(2))
 
-    # pattern like '85+ years'
-    m2 = re.search(r"(\d+)\+", s)
-    if m2:
-        return int(m2.group(1)) + 9  # approx 10-year band
+    m_plus = re.search(r"(\d+)\+", s)
+    if m_plus:
+        return int(m_plus.group(1)) + 9  # approx band
 
-    return np.nan
+    m = re.search(r"(\d+)", s)
+    return int(m.group(1)) if m else np.nan
+
 
 
 def load_raw(path_2004_2017: str, path_2018_2023: str):
